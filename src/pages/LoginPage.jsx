@@ -298,9 +298,10 @@
 
 // export default LoginPage;
 
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
 import { cityAreas, cities } from "../data/areaOptions";
 import InputField from "../components/InputField";
 
@@ -318,6 +319,31 @@ const LoginPage = () => {
   const [subArea, setSubArea] = useState("");
   const navigate = useNavigate();
 
+  const { loginWithRedirect, isAuthenticated, user: googleUser } = useAuth0();
+
+  // Handle Google login response
+  useEffect(() => {
+    if (isAuthenticated && googleUser) {
+      const storeGoogleUser = async () => {
+        const res = await fetch("http://localhost:5000/api/auth/google-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: googleUser.name,
+            email: googleUser.email,
+          }),
+        });
+
+        const data = await res.json();
+        localStorage.setItem("user", JSON.stringify(data.user));
+        navigate("/dashboard");
+      };
+
+      storeGoogleUser();
+    }
+  }, [isAuthenticated, googleUser]);
+
+  // Traditional login
   const onSubmit = async (data) => {
     try {
       const res = await fetch("http://localhost:5000/api/auth/login", {
@@ -342,7 +368,7 @@ const LoginPage = () => {
           message: result.message || "Invalid username or password",
         });
       } else {
-        clearErrors("server"); // ✅ Fix: clear error before redirect
+        clearErrors("server");
         localStorage.setItem("user", JSON.stringify(result.user));
         navigate("/dashboard");
       }
@@ -356,6 +382,7 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-dark">
+      {/* Left Form */}
       <div className="md:w-1/2 flex items-center justify-center bg-primary px-10 py-16 shadow-lg rounded-r-4xl">
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -376,7 +403,7 @@ const LoginPage = () => {
               }}
             />
             {errors.username && (
-              <p className="text-red-600 text-sm mt-1">
+              <p className="text-sm text-red-600 mt-1">
                 {errors.username.message}
               </p>
             )}
@@ -395,7 +422,7 @@ const LoginPage = () => {
               }}
             />
             {errors.password && (
-              <p className="text-red-600 text-sm mt-1">
+              <p className="text-sm text-red-600 mt-1">
                 {errors.password.message}
               </p>
             )}
@@ -442,14 +469,35 @@ const LoginPage = () => {
 
           {/* Server Error */}
           {errors.server && (
-            <p className="text-red-600 text-sm mt-2">{errors.server.message}</p>
+            <p className="text-sm text-red-600 mt-2">{errors.server.message}</p>
           )}
 
+          {/* Traditional Login Button */}
           <button
             type="submit"
             className="w-full bg-dark text-white py-2 rounded-lg hover:opacity-90"
           >
             Login
+          </button>
+
+          {/* Google Login */}
+          <div className="flex items-center gap-2 my-2">
+            <div className="flex-grow h-px bg-dark" />
+            <span className="text-dark text-sm">OR</span>
+            <div className="flex-grow h-px bg-dark" />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => loginWithRedirect({ connection: "google-oauth2" })}
+            className="w-full flex items-center justify-center gap-2 border border-dark text-dark py-2 rounded-lg hover:opacity-90"
+          >
+            <img
+              src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg"
+              alt="Google"
+              className="w-5 h-5"
+            />
+            Continue with Google
           </button>
 
           <p className="text-sm text-center text-dark">
@@ -461,7 +509,7 @@ const LoginPage = () => {
         </form>
       </div>
 
-      {/* Right Side */}
+      {/* Right Info */}
       <div className="hidden md:flex md:w-1/2 bg-dark text-white items-center justify-center p-12">
         <div>
           <h1 className="text-4xl font-bold mb-4">NoiseWatch 🚨</h1>
