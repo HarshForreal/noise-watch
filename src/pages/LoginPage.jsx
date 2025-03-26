@@ -313,12 +313,15 @@ const LoginPage = () => {
     setError,
     clearErrors,
     setValue,
+    getValues,
   } = useForm();
 
   const [area, setArea] = useState("");
   const [subArea, setSubArea] = useState("");
-  const navigate = useNavigate();
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
 
+  const navigate = useNavigate();
   const { loginWithRedirect, isAuthenticated, user: googleUser } = useAuth0();
 
   // Handle Google login response
@@ -343,7 +346,7 @@ const LoginPage = () => {
     }
   }, [isAuthenticated, googleUser]);
 
-  // Traditional login
+  // Traditional login with MFA
   const onSubmit = async (data) => {
     try {
       const res = await fetch("http://localhost:5000/api/auth/login", {
@@ -357,26 +360,48 @@ const LoginPage = () => {
 
       const result = await res.json();
 
-      if (res.status === 404) {
-        setError("server", {
-          type: "manual",
-          message: "You cannot login, you are not registered.",
+      if (res.status === 401) {
+        setError("server", { type: "manual", message: "Invalid username or password" });
+      } else if (result.mfaRequired) {
+        await fetch("http://localhost:5000/api/mfa/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: result.email }),
         });
-      } else if (!res.ok) {
-        setError("server", {
-          type: "manual",
-          message: result.message || "Invalid username or password",
-        });
+
+        setUserEmail(result.email);
+        setShowOtpInput(true);
       } else {
-        clearErrors("server");
         localStorage.setItem("user", JSON.stringify(result.user));
         navigate("/dashboard");
       }
     } catch (err) {
-      setError("server", {
-        type: "manual",
-        message: "Network error. Try again.",
+      setError("server", { type: "manual", message: "Network error. Try again." });
+    }
+  };
+
+  // OTP Verification
+  const verifyOtp = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/mfa/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail,
+          otp: getValues("otp"),
+        }),
       });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setError("server", { type: "manual", message: "Invalid OTP" });
+      } else {
+        localStorage.setItem("user", JSON.stringify(result.user));
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      setError("server", { type: "manual", message: "Network error. Try again." });
     }
   };
 
@@ -428,42 +453,26 @@ const LoginPage = () => {
             )}
           </div>
 
-          {/* City */}
-          <div>
-            <label className="block text-dark mb-1 font-medium">
-              Select City
-            </label>
-            <select
-              className="w-full border-2 border-dark px-4 py-2 rounded-lg"
-              value={area}
-              onChange={(e) => {
-                setArea(e.target.value);
-                setSubArea("");
-              }}
-            >
-              <option value="">Choose city</option>
-              {cities.map((city) => (
-                <option key={city}>{city}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Sub-Area */}
-          {area && (
+          {/* OTP Verification */}
+          {showOtpInput && (
             <div>
-              <label className="block text-dark mb-1 font-medium">
-                Select Sub-Area
-              </label>
-              <select
-                className="w-full border-2 border-dark px-4 py-2 rounded-lg"
-                value={subArea}
-                onChange={(e) => setSubArea(e.target.value)}
+              <InputField
+                label="Enter OTP"
+                type="text"
+                placeholder="Enter the OTP sent to your email"
+                {...register("otp", { required: "OTP is required" })}
+              />
+              {errors.otp && (
+                <p className="text-sm text-red-600 mt-1">{errors.otp.message}</p>
+              )}
+
+              <button
+                type="button"
+                onClick={verifyOtp}
+                className="w-full bg-dark text-white py-2 rounded-lg hover:opacity-90 mt-2"
               >
-                <option value="">Choose area</option>
-                {cityAreas[area].map((sa) => (
-                  <option key={sa}>{sa}</option>
-                ))}
-              </select>
+                Verify OTP
+              </button>
             </div>
           )}
 
@@ -472,13 +481,15 @@ const LoginPage = () => {
             <p className="text-sm text-red-600 mt-2">{errors.server.message}</p>
           )}
 
-          {/* Traditional Login Button */}
-          <button
-            type="submit"
-            className="w-full bg-dark text-white py-2 rounded-lg hover:opacity-90"
-          >
-            Login
-          </button>
+          {/* Traditional Login Button (Hidden when OTP is required) */}
+          {!showOtpInput && (
+            <button
+              type="submit"
+              className="w-full bg-dark text-white py-2 rounded-lg hover:opacity-90"
+            >
+              Login
+            </button>
+          )}
 
           {/* Google Login */}
           <div className="flex items-center gap-2 my-2">
@@ -508,18 +519,10 @@ const LoginPage = () => {
           </p>
         </form>
       </div>
-
-      {/* Right Info */}
-      <div className="hidden md:flex md:w-1/2 bg-dark text-white items-center justify-center p-12">
-        <div>
-          <h1 className="text-4xl font-bold mb-4">NoiseWatch 🚨</h1>
-          <p className="text-lg opacity-80">
-            Login and stay alert with real-time noise updates
-          </p>
-        </div>
-      </div>
     </div>
   );
 };
 
 export default LoginPage;
+
+
