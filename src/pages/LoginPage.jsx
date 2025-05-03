@@ -304,6 +304,8 @@ import { useEffect, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { cityAreas, cities } from "../data/areaOptions";
 import InputField from "../components/InputField";
+import { GoogleLogin } from "@react-oauth/google";
+import { jwtDecode } from "jwt-decode";
 
 const LoginPage = () => {
   const {
@@ -354,9 +356,9 @@ const LoginPage = () => {
           password: data.password,
         }),
       });
-
+  
       const result = await res.json();
-
+  
       if (res.status === 404) {
         setError("server", {
           type: "manual",
@@ -369,8 +371,27 @@ const LoginPage = () => {
         });
       } else {
         clearErrors("server");
-        localStorage.setItem("user", JSON.stringify(result.user));
-        navigate("/dashboard");
+  
+        // ✅ Call /send-otp with user's email
+        const otpRes = await fetch("http://localhost:5000/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: result.email }),
+        });
+  
+        if (!otpRes.ok) {
+          const errResult = await otpRes.json();
+          setError("server", {
+            type: "manual",
+            message: errResult.message || "Failed to send OTP.",
+          });
+          return;
+        }
+  
+        // ✅ OTP sent successfully
+        localStorage.setItem("pendingUser", data.username);
+        localStorage.setItem("otpEmail", result.email);
+        navigate("/verify-otp");
       }
     } catch (err) {
       setError("server", {
@@ -379,6 +400,7 @@ const LoginPage = () => {
       });
     }
   };
+  
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-dark">
@@ -487,18 +509,35 @@ const LoginPage = () => {
             <div className="flex-grow h-px bg-dark" />
           </div>
 
-          <button
-            type="button"
-            onClick={() => loginWithRedirect({ connection: "google-oauth2" })}
-            className="w-full flex items-center justify-center gap-2 border border-dark text-dark py-2 rounded-lg hover:opacity-90"
-          >
-            <img
-              src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg"
-              alt="Google"
-              className="w-5 h-5"
-            />
-            Continue with Google
-          </button>
+          <div className="mt-4 flex justify-center">
+              <GoogleLogin
+                onSuccess={async (credentialResponse) => {
+                  const decoded = jwtDecode(credentialResponse.credential); 
+                  const { email, name } = decoded;
+
+                  try {
+                    const res = await fetch("http://localhost:5000/api/auth/google", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email, name }),
+                    });
+
+                    const result = await res.json();
+                    if (!res.ok) {
+                      alert(result.message || "Google Login failed");
+                    } else {
+                      localStorage.setItem("user", JSON.stringify(result.user));
+                      navigate("/dashboard");
+                    }
+                  } catch (err) {
+                    alert("Google Login error");
+                  }
+                }}
+                onError={() => {
+                  alert("Google Login Failed"); 
+                }}
+              />
+            </div>
 
           <p className="text-sm text-center text-dark">
             Don't have an account?{" "}
