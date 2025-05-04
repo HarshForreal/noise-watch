@@ -11,25 +11,21 @@
 //     </BrowserRouter>
 //   </React.StrictMode>
 // );
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import { BrowserRouter } from "react-router-dom";
-import { Auth0Provider } from "@auth0/auth0-react";
-import "./index.css";
+  import React from "react";
+  import ReactDOM from "react-dom/client";
+  import App from "./App";
+  import { BrowserRouter } from "react-router-dom";
+  import { GoogleOAuthProvider } from "@react-oauth/google";
+  import "./index.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <Auth0Provider
-      domain="dev-n64g31ncsq5pcqbp.us.auth0.com"
-      clientId="Ub00Wt6MTjTN3ZRTCmNtadWGDz7xNfQb"
-      authorizationParams={{
-        redirect_uri: window.location.origin,
-      }}
-    >
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </Auth0Provider>
-  </React.StrictMode>
-);
+  const clientId = "786524510066-7iprfjbnkbdnubtnbnbf6tp89pvlrd9q.apps.googleusercontent.com";  
+
+  ReactDOM.createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <GoogleOAuthProvider clientId={clientId}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </GoogleOAuthProvider>
+    </React.StrictMode>
+  );

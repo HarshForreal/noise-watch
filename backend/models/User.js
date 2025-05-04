@@ -6,6 +6,8 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   area: { type: String, required: true },
   subArea: { type: String, required: true },
+  otp: { type: String },
+  otpExpires: { type: Date },
 });
 
 export default mongoose.model("User", UserSchema);
